@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { fetchFromApi } from "@/lib/services/api-service"
 
 // Cache for districts by city
 const districtsCache: Record<string, { data: any; timestamp: number }> = {}
@@ -24,13 +25,7 @@ export async function GET(request: NextRequest) {
 
     // If no cache or expired, fetch from Diyanet API
     console.log("Fetching districts from API for city:", cityId)
-    const response = await fetch(`https://awqatsalah.diyanet.gov.tr/api/timesofday/GetDistricts?cityId=${cityId}`)
-
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`)
-    }
-
-    const data = await response.json()
+    const data = await fetchFromApi<any[]>(`/api/Place/Districts/${cityId}`)
 
     // Store in cache
     districtsCache[cacheKey] = {

@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { fetchFromApi } from "@/lib/services/api-service"
 
 // Cache object to store prayer times by city and date
 const CACHE: Record<string, { data: any; timestamp: number }> = {}
@@ -26,27 +27,21 @@ export async function GET(request: NextRequest) {
     // If no cache or expired, fetch from Diyanet API
     console.log("Fetching from API for:", cacheKey)
 
-    // Construct the API URL based on the provided parameters
-    let apiUrl = "https://awqatsalah.diyanet.gov.tr/api/timesofday"
+    // Construct the API path based on the provided parameters
+    let apiPath = "";
 
     if (districtId) {
-      apiUrl += `/GetTimesOfDay?districtId=${districtId}&date=${date}`
+      apiPath = `/api/PrayerTime/Daily/${districtId}`;
     } else if (cityId) {
-      apiUrl += `/GetTimesOfDayByCity?cityId=${cityId}&date=${date}`
+      apiPath = `/api/PrayerTime/Daily/${cityId}`;
     } else if (countryId) {
-      apiUrl += `/GetTimesOfDayByCountry?countryId=${countryId}&date=${date}`
+      apiPath = `/api/PrayerTime/Daily/${countryId}`;
     } else {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
     }
 
     // Fetch data from Diyanet API
-    const response = await fetch(apiUrl)
-
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`)
-    }
-
-    const data = await response.json()
+    const data = await fetchFromApi<any>(apiPath)
 
     // Store in cache
     CACHE[cacheKey] = {
