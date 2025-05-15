@@ -23,17 +23,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cachedData.data)
     }
 
-    // If no cache or expired, fetch from Diyanet API
+    // If no cache or expired, fetch from API
     console.log("Fetching cities from API for country:", countryId)
-    const data = await fetchFromApi<any[]>(`/api/Place/Cities/${countryId}`)
 
-    // Store in cache
-    citiesCache[cacheKey] = {
-      data,
-      timestamp: Date.now(),
+    try {
+      const data = await fetchFromApi(
+        `https://awqatsalah.diyanet.gov.tr/api/timesofday/GetCities?countryId=${countryId}`,
+      )
+
+      // Store in cache
+      citiesCache[cacheKey] = {
+        data,
+        timestamp: Date.now(),
+      }
+
+      return NextResponse.json(data)
+    } catch (error) {
+      console.error("Error fetching cities:", error)
+
+      // If we have cached data, return it even if it's expired
+      if (cachedData) {
+        console.log("Returning fallback data due to error")
+        return NextResponse.json(cachedData.data)
+      }
+
+      throw error
     }
-
-    return NextResponse.json(data)
   } catch (error) {
     console.error("Error fetching cities:", error)
     return NextResponse.json({ error: "Failed to fetch cities" }, { status: 500 })

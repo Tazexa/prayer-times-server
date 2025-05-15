@@ -1,39 +1,42 @@
-import { getToken } from "./auth-service";
+import { login, isTokenExpired } from "./auth-service"
 
-export async function fetchFromApi<T>(path: string): Promise<T> {
+// ტოკენის ქეში
+let authToken: { token: string; expiresAt: string } | null = null
+
+export async function fetchFromApi(url: string) {
   try {
-    // მივიღოთ ავთენტიფიკაციის ტოკენი
-    const token = await getToken();
-    
-    const apiUrl = `${process.env.DIYANET_API_URL}${path}`;
-    
-    console.log("Fetching from API:", apiUrl);
-    
-    const response = await fetch(apiUrl, {
-      method: "GET",
+    // თუ ტოკენი არ გვაქვს ან ვადაგასულია, ვიღებთ ახალს
+    if (!authToken || isTokenExpired(authToken.expiresAt)) {
+      console.log("Getting new token")
+      authToken = await login()
+    }
+
+    // რეალური მოთხოვნა Diyanet API-სთან
+    console.log(`API request to: ${url}`)
+
+    const response = await fetch(url, {
       headers: {
-        "Accept": "application/json",
-        "Authorization": `Bearer ${token}`,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-      }
-    });
+        Accept: "application/json",
+        Authorization: `Bearer ${authToken.token}`,
+      },
+    })
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("API request failed:", errorText);
-      throw new Error(`API request failed with status ${response.status}`);
+      throw new Error(`API request failed with status: ${response.status}`)
     }
 
-    const data = await response.json();
-    
-    if (!data.success) {
-      console.error("API response error:", data);
-      throw new Error(data.message || "API request failed");
-    }
-
-    return data.data as T;
+    const data = await response.json()
+    return data
   } catch (error) {
-    console.error("API request error:", error);
-    throw error;
+    console.error("API request error:", error)
+
+    // თუ შეცდომაა, ვცდილობთ ახალი ტოკენით
+    if (error instanceof Error && error.message.includes("401")) {
+      console.log("Token expired, getting new token")
+      authToken = null
+      return fetchFromApi(url)
+    }
+
+    throw error
   }
 }

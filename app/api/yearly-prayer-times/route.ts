@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { fetchFromApi } from "@/lib/services/api-service"
 
 // Cache object to store yearly prayer times by city
 const YEARLY_CACHE: Record<string, { data: any; timestamp: number }> = {}
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cachedData.data)
     }
 
-    // If no cache or expired, fetch from Diyanet API
+    // If no cache or expired, fetch from API
     console.log("Fetching yearly data from API for:", cacheKey)
 
     // Construct the API URL based on the provided parameters
@@ -39,22 +40,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
     }
 
-    // Fetch data from Diyanet API
-    const response = await fetch(apiUrl)
+    try {
+      // Fetch data from API
+      const data = await fetchFromApi(apiUrl)
 
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`)
+      // Store in cache
+      YEARLY_CACHE[cacheKey] = {
+        data,
+        timestamp: Date.now(),
+      }
+
+      return NextResponse.json(data)
+    } catch (error) {
+      console.error("Error fetching yearly prayer times:", error)
+
+      // If we have cached data, return it even if it's expired
+      if (cachedData) {
+        console.log("Returning fallback data due to error")
+        return NextResponse.json(cachedData.data)
+      }
+
+      throw error
     }
-
-    const data = await response.json()
-
-    // Store in cache
-    YEARLY_CACHE[cacheKey] = {
-      data,
-      timestamp: Date.now(),
-    }
-
-    return NextResponse.json(data)
   } catch (error) {
     console.error("Error fetching yearly prayer times:", error)
     return NextResponse.json({ error: "Failed to fetch yearly prayer times" }, { status: 500 })

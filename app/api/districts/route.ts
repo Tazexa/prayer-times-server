@@ -23,17 +23,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cachedData.data)
     }
 
-    // If no cache or expired, fetch from Diyanet API
+    // If no cache or expired, fetch from API
     console.log("Fetching districts from API for city:", cityId)
-    const data = await fetchFromApi<any[]>(`/api/Place/Districts/${cityId}`)
 
-    // Store in cache
-    districtsCache[cacheKey] = {
-      data,
-      timestamp: Date.now(),
+    try {
+      const data = await fetchFromApi(`https://awqatsalah.diyanet.gov.tr/api/timesofday/GetDistricts?cityId=${cityId}`)
+
+      // Store in cache
+      districtsCache[cacheKey] = {
+        data,
+        timestamp: Date.now(),
+      }
+
+      return NextResponse.json(data)
+    } catch (error) {
+      console.error("Error fetching districts:", error)
+
+      // If we have cached data, return it even if it's expired
+      if (cachedData) {
+        console.log("Returning fallback data due to error")
+        return NextResponse.json(cachedData.data)
+      }
+
+      throw error
     }
-
-    return NextResponse.json(data)
   } catch (error) {
     console.error("Error fetching districts:", error)
     return NextResponse.json({ error: "Failed to fetch districts" }, { status: 500 })

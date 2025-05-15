@@ -24,32 +24,44 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cachedData.data)
     }
 
-    // If no cache or expired, fetch from Diyanet API
+    // If no cache or expired, fetch from API
     console.log("Fetching from API for:", cacheKey)
 
-    // Construct the API path based on the provided parameters
-    let apiPath = "";
+    // Construct the API URL based on the provided parameters
+    let apiUrl = "https://awqatsalah.diyanet.gov.tr/api/timesofday"
 
     if (districtId) {
-      apiPath = `/api/PrayerTime/Daily/${districtId}`;
+      apiUrl += `/GetTimesOfDay?districtId=${districtId}&date=${date}`
     } else if (cityId) {
-      apiPath = `/api/PrayerTime/Daily/${cityId}`;
+      apiUrl += `/GetTimesOfDayByCity?cityId=${cityId}&date=${date}`
     } else if (countryId) {
-      apiPath = `/api/PrayerTime/Daily/${countryId}`;
+      apiUrl += `/GetTimesOfDayByCountry?countryId=${countryId}&date=${date}`
     } else {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
     }
 
-    // Fetch data from Diyanet API
-    const data = await fetchFromApi<any>(apiPath)
+    try {
+      // Fetch data from API
+      const data = await fetchFromApi(apiUrl)
 
-    // Store in cache
-    CACHE[cacheKey] = {
-      data,
-      timestamp: Date.now(),
+      // Store in cache
+      CACHE[cacheKey] = {
+        data,
+        timestamp: Date.now(),
+      }
+
+      return NextResponse.json(data)
+    } catch (error) {
+      console.error("Error fetching prayer times:", error)
+
+      // If we have cached data, return it even if it's expired
+      if (cachedData) {
+        console.log("Returning fallback data due to error")
+        return NextResponse.json(cachedData.data)
+      }
+
+      throw error
     }
-
-    return NextResponse.json(data)
   } catch (error) {
     console.error("Error fetching prayer times:", error)
     return NextResponse.json({ error: "Failed to fetch prayer times" }, { status: 500 })
